@@ -11,14 +11,14 @@ from typing import Union
 import operator
 
 
-def lazy_exec_args(func: Callable, *args):
+def lazy_exec_args(func: Callable, *args) -> Any:
     """Выполняет функцию с callable аргументами."""
     return func(
         *map(lambda f: f() if callable(f) else f, args)
     )
 
 
-def wrapped_partial(func: Callable, *args, **kwargs):
+def wrapped_partial(func: Callable, *args, **kwargs) -> Callable:
     """Добавляет к результату partial информацию о вложенной функции."""
     partial_func = partial(lazy_exec_args, func, *args, **kwargs)
     update_wrapper(partial_func, func)
@@ -61,6 +61,10 @@ class BitwiseRuleResult:
             self,
             rule
         )
+    
+    @property
+    def __name__(self):
+        return self._func.__name__
 
 
 class BitwiseRuleMixin:
@@ -143,17 +147,17 @@ class Rule(BaseRule, BitwiseRuleMixin):
 
 
 class WrappedRule(BaseRule, BitwiseRuleMixin):
-    """Обертка для применения не `Rule` в `ComplexRule`."""
+    """Обертка для применения callable объектов как правил."""
     def __init__(
         self,
         func: Callable,
-        msg: str,
+        msg: Optional[str] = None,
         exc: Optional[Exception] = None,
         obj: Any = None,
     ):
         self._obj = obj
         self._func = func
-        self._msg = msg
+        self._msg = msg if msg else f'{func.__name__} не прошел проверку'
         self._exc = exc if exc else ValueError
     
     def _exec_func(self) -> bool:
@@ -161,13 +165,13 @@ class WrappedRule(BaseRule, BitwiseRuleMixin):
         return bool(self._func(self._obj))
 
 
-class ComplexRule(Followable):
-    """Состаное правило для проверки объекта."""
+class BitwiseRule(Followable):
+    """Побитовое правило для проверки объекта."""
 
     def __init__(
         self,
-        rule: Callable,
-        msg: str,
+        rule: BitwiseRuleResult,
+        msg: Optional[str] = None,
         exc: Optional[Exception] = None,
     ):
         self._rule = rule
@@ -226,7 +230,7 @@ checker = Checker(
         a_rule,
         b_rule,
         c_rule,
-        ComplexRule(a_rule & b_rule, msg='Внимание!')
+        BitwiseRule(a_rule & b_rule)
     ),
 )
 checker.check()
@@ -237,7 +241,7 @@ checker = Checker(
     obj=test,
     rules=(
         a_rule,
-        ComplexRule(a_rule & b_rule | c_rule, msg='Внимание!!!')
+        BitwiseRule(a_rule | b_rule)
     ),
 )
 checker.check()
@@ -252,8 +256,8 @@ checker = Checker(
     obj=test,
     rules=(
         a_rule,
-        WrappedRule(func=chek_test1, msg='Бяда1 !'),
-        ComplexRule(WrappedRule(func=chek_test, msg='Бяда!', obj=test) | a_rule, msg='Бяда!'),
+        WrappedRule(func=chek_test1),
+        BitwiseRule(WrappedRule(func=chek_test, msg='Бяда!', obj=test) & a_rule, msg='Бяда!'),
     ),
 )
 checker.check()
