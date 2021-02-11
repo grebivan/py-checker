@@ -150,19 +150,19 @@ class WrappedRule(BaseRule, BitwiseRuleMixin):
     """Обертка для применения callable объектов как правил."""
     def __init__(
         self,
-        func: Callable,
+        rule: Callable,
         msg: Optional[str] = None,
         exc: Optional[Exception] = None,
         obj: Any = None,
     ):
         self._obj = obj
-        self._func = func
-        self._msg = msg if msg else f'{func.__name__} не прошел проверку'
+        self._rule = rule
+        self._msg = msg if msg else f'{rule.__name__} не прошел проверку'
         self._exc = exc if exc else ValueError
     
     def _exec_func(self) -> bool:
         """Выполняет проверку по правилу."""
-        return bool(self._func(self._obj))
+        return bool(self._rule(self._obj))
 
 
 class BitwiseRule(Followable):
@@ -256,8 +256,8 @@ checker = Checker(
     obj=test,
     rules=(
         a_rule,
-        WrappedRule(func=chek_test1),
-        BitwiseRule(WrappedRule(func=chek_test, msg='Бяда!', obj=test) & a_rule, msg='Бяда!'),
+        WrappedRule(rule=chek_test1),
+        BitwiseRule(WrappedRule(rule=chek_test, msg='Бяда!', obj=test) | a_rule, msg='Бяда!'),
     ),
 )
 checker.check()
