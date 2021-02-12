@@ -2,3 +2,6 @@
 .python-version
 .venv
 venv
+
+# IDE
+.vscode

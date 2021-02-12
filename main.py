@@ -37,10 +37,24 @@ class Followable(metaclass=ABCMeta):
 class BitwiseRuleResult:
     """Результат выполнения побитовой операции для правила."""
     def __init__(self, func: Callable, *args):
-        self._func = wrapped_partial(func, *args)
+        self._func = func
+        self._args = args
+        self._obj = None
+    
+    @property
+    def obj(self):
+        return self._obj
+    
+    @obj.setter
+    def obj(self, obj):
+        self._obj = obj
     
     def __call__(self) -> Any:
-        return self._func()
+        for arg in self._args:
+            if hasattr(arg, '__self__') and self.obj:
+                arg.__self__.obj = self.obj
+        
+        return lazy_exec_args(self._func, *self._args)
     
     def __and__(self, rule: Union['Rule', Callable]) -> 'BitwiseRuleResult':
         if isinstance(rule, Rule):
@@ -173,13 +187,24 @@ class BitwiseRule(Followable):
         rule: BitwiseRuleResult,
         msg: Optional[str] = None,
         exc: Optional[Exception] = None,
+        obj: Any = None
     ):
         self._rule = rule
         self._exc = exc if exc else ValueError
         self._msg = msg if msg else f'{rule.__name__} не прошел проверку'
+        self._obj = obj
+    
+    @property
+    def obj(self):
+        return self._obj
+    
+    @obj.setter
+    def obj(self, obj: Any):
+        self._obj = obj
     
     def follow(self) -> bool:
         """Проверяет соответствие правилу."""
+        self._rule.obj = self.obj
         if not self._rule():
             raise self._exc(self._msg)
 
@@ -257,7 +282,49 @@ checker = Checker(
     rules=(
         a_rule,
         WrappedRule(rule=chek_test1),
-        BitwiseRule(WrappedRule(rule=chek_test, msg='Бяда!', obj=test) | a_rule, msg='Бяда!'),
+        BitwiseRule(WrappedRule(rule=chek_test, msg='Бяда1!') | a_rule, msg='Бяда!'),
     ),
 )
 checker.check()
+
+
+class CheckerMeta(type):
+
+    def __new__(cls, *args, **kwargs):
+        class_attrs = args[-1]
+        rules = {}
+        for attr_name, attr_value in class_attrs.items():
+            if isinstance(attr_value, Followable):
+                rules[attr_name] = attr_value
+        
+        for rule_name in rules:
+            class_attrs.pop(rule_name)
+
+        class_attrs["_rules"] = rules
+        instance = super().__new__(cls, *args, **kwargs)
+        return instance
+
+
+class BaseChecker(metaclass=CheckerMeta):
+    """Базовый класс для проверки объекта по набору правил."""
+
+    def __init__(self, obj: Any):
+        self._obj = obj
+    
+    def check(self):
+        """Выполняет проверку объекта по указанным правилам."""
+        for rule_name, rule in self._rules.items():
+            if hasattr(rule, "obj"):
+                rule.obj = self._obj
+            
+            rule.follow()
+
+
+class TestChecker(BaseChecker):
+    a_rule = Rule(attribute='a', func=lambda x: x=='a')
+    b_rule = BitwiseRule(
+        Rule(attribute='b', func=lambda x: x=='b') | a_rule
+    )
+
+test_ch = TestChecker(test)
+test_ch.check()
