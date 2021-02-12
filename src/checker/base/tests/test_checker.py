@@ -2,11 +2,6 @@ from typing import Any
 
 import pytest
 
-# from checker.base.checker import BaseChecker
-# from checker.base.rules import BitwiseRule
-# from checker.base.rules import Rule
-# from checker.base.rules import WrappedRule
-
 from ..checker import BaseChecker
 from ..rules import BitwiseRule
 from ..rules import Rule
