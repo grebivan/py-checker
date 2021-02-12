@@ -1,7 +1,13 @@
 # python
+__pycache__
+
+# venv
 .python-version
 .venv
 venv
 
 # IDE
 .vscode
+
+# tests
+.pytest_cache
